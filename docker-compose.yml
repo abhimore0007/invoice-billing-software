@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ruby
+      POSTGRES_PASSWORD: ruby
+      POSTGRES_DB: ruby
+    ports:
+      - "5432:5432"
+    volumes:
+      - ruby_data:/var/lib/postgresql/data
+volumes:
+  ruby_data:

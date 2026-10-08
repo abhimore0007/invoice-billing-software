@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(cuid())
+  name String
+  username String @unique
+  password String
+  role String @default("Staff")
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+model Client {
+  id String @id @default(cuid())
+  name String
+  company String
+  address String
+  city String
+  state String
+  pincode String
+  gst String
+  phone String
+  email String
+  documents Document[]
+  createdAt DateTime @default(now())
+}
+model Document {
+  id String @id @default(cuid())
+  sequence Int @unique @default(autoincrement())
+  number String @unique
+  type String
+  status String @default("Pending")
+  date DateTime
+  dueDate DateTime?
+  clientId String
+  client Client @relation(fields: [clientId], references: [id])
+  data Json
+  total Decimal @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+}
