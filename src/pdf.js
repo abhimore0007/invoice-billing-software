@@ -4,16 +4,16 @@ import {totals,words} from '../shared/billing.js';
 
 export const company={
   name:'Ruby Hydraulic Co.',
-  address:['823, Kalamboli Steel Market, Near Disma Kata,','Kalamboli Service Road No.8, Navi Mumbai-410 218'],
+  address:['823, Kalamboli Steel Market, Near Disma Kata,','Kalamboli Service Road No.8,','Navi Mumbai - 410 218'],
   gst:'27AYYPS6944F1ZH',
-  bank:['Ruby Hydraulic Co.','922030067831478','UTIB0001965','Kalamboli Navi Mumbai','Current','AXIS Bank Limited'],
-  terms:'All Disputes are Subject to Mumbai jurisdiction Only.',
+  bank:['Ruby Hydraulic Co.','922030067831478','UTIB0001965','Kalamboli, Navi Mumbai','Current','AXIS Bank\nLimited'],
+  terms:'All disputes are subject to Mumbai jurisdiction only.',
 };
 
 let assetsPromise;
 export function loadPDFAssets(){
   if(!assetsPromise){
-    const files={letterhead:'letterhead.png',watermark:'watermark.png',footer:'footer.png',regular:'reference-regular.ttf',bold:'reference-bold.ttf'};
+    const files={logo:'v6-logo.png',regular:'reference-regular.ttf',bold:'reference-bold.ttf'};
     assetsPromise=Promise.all(Object.entries(files).map(async([key,file])=>{
       const response=await fetch(`/branding/${file}`);
       if(!response.ok)throw Error(`Cannot load invoice branding (${file}). Refresh and try again.`);
@@ -25,123 +25,136 @@ export function loadPDFAssets(){
   return assetsPromise;
 }
 
-// All measurements are PDF points, matching the client's A4 reference.
+// A4 coordinates and typography follow Invoice_RHC-26-27-602_v6.pdf.
 export function createPDF(doc,assets){
-  if(!assets)throw Error('Invoice branding must be loaded before creating a PDF.');
+  if(!assets?.logo)throw Error('Invoice branding must be loaded before creating a PDF.');
   const pdf=new jsPDF({unit:'pt',format:'a4',compress:true,putOnlyUsedFonts:true});
   pdf.addFileToVFS('reference-regular.ttf',assets.regular);
   pdf.addFileToVFS('reference-bold.ttf',assets.bold);
   pdf.addFont('reference-regular.ttf','Reference','normal');
   pdf.addFont('reference-bold.ttf','Reference','bold');
-  const data=doc.data,client=doc.client,total=totals(data),challan=doc.type==='Delivery Challan';
-  const left=11.25,right=584.03,width=right-left,red=[244,48,50],gray=[86,86,86];
-  const cash=n=>Number(n||0).toFixed(2);
-  const text=(value,x,y,size=9,bold=false,options={})=>{
-    pdf.setFont('Reference',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(...gray);
-    pdf.text(Array.isArray(value)?value:String(value),x,y,options);
+  const {data,client}=doc,total=totals(data),challan=doc.type==='Delivery Challan';
+  const left=40,right=555.28,width=right-left,height=pdf.internal.pageSize.getHeight();
+  const ink=[46,55,67],muted=[113,118,128],red=[153,29,51],line=[207,209,214],panel=[243,244,246];
+  const cash=n=>Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const text=(value,x,y,size=9,bold=false,options={},color=ink)=>{
+    const content=Array.isArray(value)?value:String(value);
+    // Keep the reference's Helvetica metrics; retain Unicode support for client data.
+    pdf.setFont(/[^\x20-\x7e\n]/.test(String(content))?'Reference':'helvetica',bold?'bold':'normal');
+    pdf.setFontSize(size);pdf.setTextColor(...color);pdf.text(content,x,y,options);
   };
+  const wrap=(value,max,size=9,bold=false)=>{
+    pdf.setFont(/[^\x20-\x7e\n]/.test(String(value))?'Reference':'helvetica',bold?'bold':'normal');pdf.setFontSize(size);
+    return pdf.splitTextToSize(String(value||''),max);
+  };
+  const rule=(y,color=line,x=left,end=right)=>{pdf.setDrawColor(...color);pdf.setLineWidth(.6);pdf.line(x,y,end,y);};
+  const title={Invoice:'TAX INVOICE',Proforma:'PROFORMA INVOICE',Quotes:'QUOTATION','Delivery Challan':'DELIVERY CHALLAN'}[doc.type]||doc.type;
   function background(){
-    pdf.addImage(assets.watermark,'PNG',0,0,750,750,'watermark','FAST');
-    pdf.addImage(assets.letterhead,'PNG',0,23.77,595.28,77.349,'letterhead','FAST');
+    pdf.setFillColor(...red);pdf.rect(0,0,595.28,10,'F');pdf.rect(0,height-10,595.28,10,'F');
+    pdf.saveGraphicsState();pdf.setGState(new pdf.GState({opacity:.055}));
+    pdf.addImage(assets.logo,'PNG',108,420,370,89,'logo','FAST');pdf.restoreGraphicsState();
+    pdf.addImage(assets.logo,'PNG',40,47,187,45,'logo','FAST');
+    text(title,right,58,title.length>16?18:24,true,{align:'right'});
+    text('Original For Recipient',right,76,8.5,false,{align:'right'},muted);
+    text('ISO 9001 : 2015 Certified',right,89,8.5,false,{align:'right'},muted);
+    rule(108);
   }
   background();
-  pdf.internal.events.subscribe('addPage',()=>{
-    background();
-    text(`${doc.type} No : ${doc.number}`,right,119.18,9,false,{align:'right'});
-  });
-  const title={Invoice:'TAX Invoice',Proforma:'PROFORMA Invoice',Quotes:'QUOTATION','Delivery Challan':'DELIVERY CHALLAN'}[doc.type]||doc.type;
-  text(title,right,119.18,doc.type==='Invoice'?22.5:19,true,{align:'right'});
-  text(`Challan No. : ${data.challanNo||''}`,right,139.71,9,false,{align:'right'});
-  text(`P.O. No. : ${data.poNo||''}`,right,154.11,9,false,{align:'right'});
-  text('From,',left,132.77,9.75,true);
-  text(company.name,left,148.02,11.25,true);
-  text(company.address[0],left,160.63);
-  text(company.address[1],left,175.03);
-  text(`GSTIN: ${company.gst}`,left,189.43);
-  text('To,',left,221.49,9.75,true);
-  pdf.setFont('Reference','bold');pdf.setFontSize(11.25);
-  const names=pdf.splitTextToSize(client.company.toUpperCase(),width);
-  text(names,left,236,11.25,true,{lineHeightFactor:1.29});
-  const nameExtra=(names.length-1)*14.51;
-  pdf.setFont('Reference','normal');pdf.setFontSize(9);
-  const address=[client.address,client.city].filter(Boolean).join(', ')+(client.pincode?`-${client.pincode}`:'');
-  const addresses=pdf.splitTextToSize(address,Math.min(405,width));
-  text(addresses,left,248.61+nameExtra,9,false,{lineHeightFactor:1.6});
-  const extra=nameExtra+(addresses.length-1)*14.4;
+  pdf.internal.events.subscribe('addPage',()=>{background();text(`${doc.type} No. ${doc.number}`,right,126,9,true,{align:'right'});});
   const state=client.state||'',stateCode=(client.gst||'').slice(0,2);
-  text(`State: ${state}   State Code: ${stateCode}`,left,263.01+extra);
-  text(`GSTIN: ${client.gst||''}`,left,277.41+extra);
-  text(`Place Of Supply: ${state}`,left,291.81+extra);
-  text('Original For Recipient',right,249.83+extra,11.25,true,{align:'right'});
-  pdf.setDrawColor(...gray);pdf.setLineWidth(.45);
-  const recipientWidth=pdf.getTextWidth('Original For Recipient');
-  pdf.line(right-recipientWidth,250.9+extra,right,250.9+extra);
-  text(`${doc.type==='Invoice'?'Invoice':doc.type} No : ${doc.number}`,right,265.26+extra,9,false,{align:'right'});
-  text(`Date : ${String(doc.date).slice(0,10)}`,right,279.66+extra,9,false,{align:'right'});
-
-  const base={theme:'plain',tableWidth:width,margin:{left,right:11.25,top:133,bottom:128},rowPageBreak:'avoid',
-    styles:{font:'Reference',fontStyle:'normal',fontSize:9,textColor:gray,fillColor:false,lineColor:red,lineWidth:.75,minCellHeight:14.55,cellPadding:{left:6.75,right:4,top:2,bottom:2},valign:'top',overflow:'linebreak'},
-    headStyles:{font:'Reference',fontStyle:'bold',fontSize:7.5,textColor:[255,255,255],fillColor:[247,63,56],minCellHeight:31.2,cellPadding:{left:6.75,right:4,top:6.8,bottom:6.8}},
+  const supply=state+(stateCode?` (State Code ${stateCode})`:'');
+  const date=new Date(String(doc.date).slice(0,10)+'T00:00:00Z');
+  const formattedDate=Number.isNaN(date.getTime())?String(doc.date):date.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'});
+  const meta=[['INVOICE NO.',doc.number,40,140],['INVOICE DATE',formattedDate,190,130],['PLACE OF SUPPLY',supply,330,130],['REVERSE CHARGE','No',470,85]];
+  let metaBottom=140;
+  for(const [label,value,x,w] of meta){
+    text(label==='INVOICE NO.'&&doc.type!=='Invoice'?`${doc.type.toUpperCase()} NO.`:label,x,124,7,true,{},muted);
+    const lines=wrap(value,w,10.5,true);text(lines,x,139,10.5,true,{lineHeightFactor:1.2});metaBottom=Math.max(metaBottom,139+(lines.length-1)*12.6);
+  }
+  rule(metaBottom+13);
+  const panelY=metaBottom+29,panelWidth=250;
+  const name=wrap(client.company.toUpperCase(),222,10.5,true);
+  const address=wrap([client.address,client.city].filter(Boolean).map(v=>v.replace(/[,\s]+$/,'')).join(client.city?'\n':'')+(client.pincode?` - ${client.pincode}`:''),222,8.5);
+  const stateLines=wrap(`State: ${state} | State Code: ${stateCode}`,222,8.5);
+  const panelHeight=Math.max(108,32+name.length*13+address.length*11.5+stateLines.length*11.5+15);
+  for(const x of [left,306]){pdf.setFillColor(...panel);pdf.rect(x,panelY,panelWidth,panelHeight,'F');pdf.setFillColor(...red);pdf.rect(x,panelY,3.5,panelHeight,'F');}
+  text('BILLED BY',54,panelY+16,7.5,true,{},red);text('BILLED TO',320,panelY+16,7.5,true,{},red);
+  text(company.name,54,panelY+32,10.5,true);
+  text(company.address,54,panelY+45,8.5,false,{lineHeightFactor:1.35});
+  text(`GSTIN: ${company.gst}`,54,panelY+79,8.5);
+  let cy=panelY+32;text(name,320,cy,10.5,true,{lineHeightFactor:1.24});cy+=name.length*13;
+  text(address,320,cy,8.5,false,{lineHeightFactor:1.35});cy+=address.length*11.5;
+  text(stateLines,320,cy,8.5,false,{lineHeightFactor:1.35});cy+=stateLines.length*11.5;
+  text(`GSTIN: ${client.gst||''}`,320,cy,8.5);
+  let tableY=panelY+panelHeight+24;
+  const references=[['Challan No.',data.challanNo],['P.O. No.',data.poNo]].filter(([,value])=>value);
+  if(references.length){text(references.map(([label,value])=>`${label}: ${value}`).join('    '),left,tableY,8);tableY+=14;}
+  const base={theme:'plain',tableWidth:width,margin:{left,right:40,top:143,bottom:85},rowPageBreak:'avoid',
+    styles:{font:'helvetica',fontStyle:'normal',fontSize:9,textColor:ink,fillColor:false,lineColor:line,lineWidth:{bottom:.5},cellPadding:{left:8,right:8,top:5.4,bottom:5.4},valign:'middle',overflow:'linebreak'},
+    headStyles:{fontStyle:'bold',fontSize:8.5,textColor:[255,255,255],fillColor:ink,lineWidth:0,cellPadding:{left:4,right:8,top:9,bottom:9}},
+    didParseCell:cell=>{if(/[^\x20-\x7e\n]/.test(cell.cell.text.join('')))cell.cell.styles.font='Reference';},
   };
-  const columnWidths=challan?[25.22,332.81,95.75,119]:[25.22,255,77.81,68.94,57.22,88.59];
-  autoTable(pdf,{...base,startY:301.43+extra,showHead:'everyPage',
-    head:[challan?['Sr.\nNo.','Particulars','HSN','Quantity']:['Sr.\nNo.','Particulars','HSN','Quantity','Rate','Amount (INR)']],
-    body:data.items.map((item,i)=>challan?[i+1,item.description,item.hsn,item.qty]:[i+1,item.description,item.hsn,item.qty,String(Number(item.rate)),cash(item.qty*item.rate)]),
-    columnStyles:Object.fromEntries(columnWidths.map((cellWidth,i)=>[i,{cellWidth}])),
-    willDrawCell:cell=>{
-      if(cell.section!=='head')return;
-      // Match the red-to-coral header in the reference without an image dependency.
-      const {x,y,width:w,height:h}=cell.cell;
-      for(let step=0;step<40;step++){
-        const ratio=step/39;pdf.setFillColor(255-Math.round(18*ratio),34+Math.round(52*ratio),36+Math.round(33*ratio));
-        pdf.rect(x,y+h*step/40,w,h/40+.1,'F');
-      }
-      cell.cell.styles.fillColor=false;
+  autoTable(pdf,{...base,startY:tableY,showHead:'everyPage',head:[challan?['Sr. No.','Particulars','HSN','Qty']:['Sr. No.','Particulars','HSN','Qty','Rate (INR)','Amount (INR)']],
+    theme:'grid',styles:{...base.styles,lineWidth:.6},headStyles:{...base.headStyles,lineWidth:.6,lineColor:line},
+    body:data.items.map((item,i)=>challan?[i+1,item.description,item.hsn,item.qty]:[i+1,item.description,item.hsn,item.qty,cash(item.rate),cash(item.qty*item.rate)]),
+    columnStyles:challan?{0:{cellWidth:34,halign:'center'},1:{cellWidth:335},2:{cellWidth:86,halign:'center'},3:{cellWidth:width-455,halign:'center'}}:
+      {0:{cellWidth:34,halign:'center'},1:{cellWidth:220},2:{cellWidth:60,halign:'center'},3:{cellWidth:48,halign:'center'},4:{cellWidth:70,halign:'right'},5:{cellWidth:width-432,halign:'right'}},
+    didParseCell:cell=>{
+      base.didParseCell(cell);
+      if(cell.section==='head'){
+        cell.cell.styles.halign=cell.column.index===1?'left':cell.column.index>=4?'right':'center';
+        if(cell.column.index===0)cell.cell.styles.cellPadding={left:2,right:2,top:9,bottom:9};
+      }else cell.cell.styles.cellPadding={left:8,right:8,top:6.5,bottom:6.5};
     },
   });
   if(!challan){
     const rows=[];
     if(Number(data.discount))rows.push([`Discount (${data.discount}%)`,cash(total.discount)]);
     rows.push(['Total Taxable Amount',cash(total.taxable)],
-      [`CGST ${Number(data.cgst)?cash(data.cgst):''}%`,cash(total.cgst)],
-      [`SGST ${Number(data.sgst)?cash(data.sgst):''}%`,cash(total.sgst)],
-      [`IGST ${Number(data.igst)?cash(data.igst):''}%`,cash(total.igst)],
-      ['Rounding Off',cash(data.rounding)],['Total Payable Amount',cash(total.total)],['GST Payable On Reverse Charges','No']);
-    autoTable(pdf,{...base,startY:pdf.lastAutoTable.finalY,body:rows,columnStyles:{0:{cellWidth:484.19},1:{cellWidth:88.59}},didParseCell:cell=>{
-      if(['Total Taxable Amount','Total Payable Amount'].includes(cell.row.raw[0])&&cell.column.index===1){cell.cell.styles.fontStyle='bold';if(cell.row.raw[0]==='Total Taxable Amount'){cell.cell.styles.fontSize=9.75;cell.cell.styles.minCellHeight=24.45;cell.cell.styles.valign='middle';}}
+      [`CGST ${Number(data.cgst)?Number(data.cgst).toFixed(2):''}%`,cash(total.cgst)],
+      [`SGST ${Number(data.sgst)?Number(data.sgst).toFixed(2):''}%`,cash(total.sgst)],
+      [`IGST ${Number(data.igst)?Number(data.igst).toFixed(2):''}%`,cash(total.igst)],
+      ['Rounding Off',cash(data.rounding)],['TOTAL PAYABLE AMOUNT',`INR ${cash(total.total)}`],['GST Payable On Reverse Charges','No']);
+    autoTable(pdf,{...base,startY:pdf.lastAutoTable.finalY,body:rows,columnStyles:{0:{cellWidth:width-125},1:{cellWidth:125,halign:'right'}},didParseCell:cell=>{
+      const label=cell.row.raw[0];
+      if(label==='Total Taxable Amount')cell.cell.styles.fontStyle='bold';
+      if(label==='TOTAL PAYABLE AMOUNT')Object.assign(cell.cell.styles,{fontStyle:'bold',fontSize:11,textColor:red,fillColor:[250,234,237],lineColor:red,lineWidth:{top:1,bottom:1},cellPadding:{left:8,right:8,top:7,bottom:7}});
+      if((label.startsWith('CGST')&&!Number(data.cgst))||(label.startsWith('SGST')&&!Number(data.sgst))||label==='Rounding Off')cell.cell.styles.textColor=muted;
     }});
     const priceWords=words(total.total).replace(/ Hundred (?=\w)/g,' Hundred And ');
-    autoTable(pdf,{...base,startY:pdf.lastAutoTable.finalY,body:[[
-      {content:'Price in Words:',styles:{fontStyle:'bold',cellWidth:79.08,lineWidth:{top:.75,bottom:.75,left:.75,right:0},cellPadding:{left:6.75,right:0,top:2,bottom:2}}},
-      {content:priceWords,styles:{lineWidth:{top:.75,bottom:.75,left:0,right:.75},cellPadding:{left:0,right:4,top:2,bottom:2}}},
+    autoTable(pdf,{...base,startY:pdf.lastAutoTable.finalY,styles:{...base.styles,fillColor:panel,lineColor:ink},body:[[
+      {content:'Price in Words:',styles:{fontStyle:'bold',cellWidth:76,cellPadding:{left:8,right:0,top:7,bottom:7}}},
+      {content:priceWords,styles:{cellPadding:{left:0,right:8,top:7,bottom:7}}},
     ]]});
   }
   let y=pdf.lastAutoTable.finalY;
-  if(y+80>714){pdf.addPage();y=133;}
-  text('Bank Details:',left,y+11,9.75,true);
-  autoTable(pdf,{...base,startY:y+16,head:[['Account Name','Account Number','IFSC Code','Branch','Account Type','Bank Name']],body:[company.bank],
-    styles:{...base.styles,fontSize:8.25,cellPadding:{left:6.75,right:3,top:6.58,bottom:6.58}},
-    headStyles:{font:'Reference',fontStyle:'bold',fontSize:8.25,textColor:gray,fillColor:false,cellPadding:{left:6.75,right:3,top:6.58,bottom:6.58}},
-    columnStyles:Object.fromEntries([83.7,83.54,63.02,191.6,69.33,81.59].map((cellWidth,i)=>[i,{cellWidth}]))});
-  autoTable(pdf,{...base,startY:pdf.lastAutoTable.finalY+1,styles:{...base.styles,fontStyle:'bold',lineWidth:0,cellPadding:{left:0,right:0,top:2,bottom:2}},body:[['Terms And Conditions:'],[(data.terms||company.terms).split('\n').map(line=>'• '+line.replace(/^•\s*/, '')).join('\n')]]});
+  // Keep bank details and the final sign-off together where possible.
+  const terms=wrap((data.terms||company.terms).split('\n').map((v,i)=>`${i+1}. ${v.replace(/^[•\d.\s]+/,'')}`).join('\n'),305,8.5);
+  const signoffHeight=Math.max(88,terms.length*11+34);
+  if(y+105+signoffHeight>height-90){pdf.addPage();y=143;}
+  text('BANK DETAILS',left,y+26,8.5,true);
+  autoTable(pdf,{...base,startY:y+36,head:[['Account Name','Account Number','IFSC Code','Branch','Account Type','Bank Name']],body:[company.bank],
+    styles:{...base.styles,fontSize:8.5,fillColor:panel,cellPadding:{left:7,right:4,top:7,bottom:7}},
+    headStyles:{...base.headStyles,fontSize:7.4,cellPadding:{left:7,right:3,top:7,bottom:7}},
+    columnStyles:Object.fromEntries([100,105,70,110,65,width-450].map((cellWidth,i)=>[i,{cellWidth,fontStyle:i<3?'bold':'normal'}]))});
+  y=pdf.lastAutoTable.finalY+30;
+  if(y+66>height-85){pdf.addPage();y=155;}
+  text('TERMS & CONDITIONS',left,y,8.5,true);
+  // AutoTable allows unusually long terms to continue safely across pages.
+  autoTable(pdf,{...base,startY:y+4,tableWidth:305,styles:{...base.styles,fontSize:8.5,lineWidth:0,cellPadding:0},body:terms.map(term=>[term])});
+  const end=pdf.lastAutoTable.finalY;
+  if(end+64>height-85){pdf.addPage();y=155;}else y=Math.max(y,end-14);
+  text(`For ${company.name}`,right,y,9,true,{align:'right'});
+  pdf.setFont('helvetica','italic');pdf.setFontSize(10.5);pdf.setTextColor(...ink);pdf.text('Mohd Alam N Shaikh',460,y+36,{align:'center'});
+  text('Digitally signed by Mohd Alam N Shaikh',460,y+46,6,false,{align:'center'},muted);
+  rule(y+54,ink,365,right);text('Authorized Signatory',460,y+66,8.5,true,{align:'center'});
+  pdf.setFont('helvetica','italic');pdf.setFontSize(9);pdf.setTextColor(...muted);pdf.text('Thank you for your business.',left,y+62);
   const pages=pdf.getNumberOfPages();
-  // The reference artwork contains both the signature and red contact strip.
-  // Align it to the table margins, but reveal the signature on the final page only.
-  const footerScale=width/924;
-  const footerBottom=pdf.internal.pageSize.getHeight()-left;
-  const artworkHeight=170*footerScale;
-  const artworkTop=footerBottom-artworkHeight;
-  const contactTop=artworkTop+119*footerScale;
   for(let p=1;p<=pages;p++){
-    pdf.setPage(p);
-    pdf.saveGraphicsState();
-    if(p!==pages){
-      pdf.rect(left,contactTop,width,footerBottom-contactTop,null);
-      pdf.clip();pdf.discardPath();
-    }
-    pdf.addImage(assets.footer,'PNG',left,artworkTop,width,artworkHeight,'footer','FAST');
-    pdf.restoreGraphicsState();
-    if(pages>1)text(`Page ${p} of ${pages}`,right,contactTop-8,7,false,{align:'right'});
+    pdf.setPage(p);rule(height-62);
+    text('823, Kalamboli Steel Market, Near Disma Kanta, Service Road No. 8, Kalamboli, Navi Mumbai - 410 218',297.64,height-48,8,false,{align:'center'},muted);
+    text('Tel: 27426680   |   Mo: 9892095068 / 9920905068   |   info@rubyhydraulic.com   |   www.rubyhydraulic.com',297.64,height-36,8,false,{align:'center'},muted);
+    if(pages>1)text(`Page ${p} of ${pages}`,right,height-69,7,false,{align:'right'},muted);
   }
   return pdf;
 }

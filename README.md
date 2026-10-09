@@ -79,14 +79,14 @@ The screenshot-specific field restriction was prioritized over the conflicting g
 
 ### Client reference PDF
 
-The PDF template now follows **JINDAL-INVOICE-602.6.10.26.pdf**: original RHC/Ruby letterhead and hose watermark, matching DejaVu Sans Condensed fonts, recipient details, red gradient table header and red borders, tax rows, amount in words, bank details, terms, and fixed footer artwork. Company/GST/bank details in `src/pdf.js` are transcribed from that supplied reference. Client data, invoice numbers, dates, items, taxes, amounts, and terms remain dynamic. Zero tax values are correctly formatted as `0.00` rather than the reference's `0.00.00` typo. Multi-page documents repeat table headings and reserve space for the footer. Long client names and addresses expand the header to avoid overlaps.
+The PDF template follows **Invoice_RHC-26-27-602_v6.pdf**: the extracted RHC/Ruby logo, burgundy page strips, Helvetica typography, invoice metadata, side-by-side gray billing panels, dark table headers, pale-red payable total, amount in words, bank details, terms, signature block, and contact footer. DejaVu fonts provide fallback for non-ASCII text. Company/GST/bank details in `src/pdf.js` are transcribed from the reference. Client data, invoice numbers, dates, items, taxes, amounts, and terms remain dynamic. Multi-page documents repeat table headings and reserve space for the footer. Long client names and addresses expand the billing panels.
 
-The in-app preview renders the actual generated PDF, so it shares the downloaded document's layout. The red contact footer aligns with the table margins on every page, with page numbering immediately above it. The signature appears only on the final page, after all invoice content. Files in `public/branding/` are required for PDF generation; the DejaVu font license is included. The signature/footer is static artwork from the supplied reference, **not a cryptographic digital signature**. The generation process does not attach or validate signing certificates.
+The in-app preview renders the actual generated PDF, so it shares the downloaded document's layout. The contact footer aligns with the table margins on every page, with page numbering for multi-page documents. The signature appears only on the final page, after all invoice content. Files in `public/branding/` are required for PDF generation; the DejaVu font license is included. The signature text reproduces the reference's appearance; it is **not a cryptographic digital signature**. The generation process does not attach or validate signing certificates.
 
 To regenerate reference assets if needed:
 
 ```sh
-node scripts/extract-reference.mjs "E:\JINDAL-INVOICE-602.6.10.26.pdf"
+node scripts/extract-v6-logo.mjs "E:\Invoice_RHC-26-27-602_v6.pdf"
 ```
 
 Revenue is the sum of Paid invoices, dated by invoice date. Pending payments include Pending and Overdue invoices. No payment-gateway integration or automatic collection is included. PDFs embed DejaVu fonts; scripts outside that font's coverage need additional fonts. Client details currently reflect the current client record, not an immutable historical snapshot.

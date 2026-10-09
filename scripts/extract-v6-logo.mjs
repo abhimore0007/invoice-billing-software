@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import {encode} from 'fast-png';
+const {getDocument,OPS}=await import('pdfjs-dist/legacy/build/pdf.mjs');
+const source=process.argv[2];
+if(!source)throw Error('Usage: node scripts/extract-v6-logo.mjs <reference.pdf>');
+const task=getDocument({data:new Uint8Array(fs.readFileSync(source)),useSystemFonts:true});
+const document=await task.promise,page=await document.getPage(1);
+const operators=await page.getOperatorList();
+const index=operators.fnArray.indexOf(OPS.paintImageXObject);
+if(index<0)throw Error('Reference contains no logo image');
+const image=await new Promise(resolve=>page.objs.get(operators.argsArray[index][0],resolve));
+if(![2,3].includes(image.kind))throw Error('Unsupported logo pixel format');
+fs.writeFileSync(new URL('../public/branding/v6-logo.png',import.meta.url),encode({width:image.width,height:image.height,data:image.data,channels:image.kind===3?4:3}));
+console.log('Extracted v6 logo:',image.width,image.height);
+await task.destroy();

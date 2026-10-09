@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 
-test('signature is visible only on the final PDF page and footer stays aligned',async({page})=>{
+test('v6 PDF renders burgundy page strips and aligned contact footers on every page',async({page})=>{
   await page.goto('/',{waitUntil:'domcontentloaded'});
   const pages=await page.evaluate(async()=>{
     const {createPDF,loadPDFAssets}=await import('/src/pdf.js');
@@ -12,19 +12,21 @@ test('signature is visible only on the final PDF page and footer stays aligned',
     try{
       await renderer.ready;
       return Array.from(container.querySelectorAll('canvas')).map(canvas=>{
-        const context=canvas.getContext('2d'),pixels=context.getImageData(18,1095,330,93).data;
+        const context=canvas.getContext('2d'),pixels=context.getImageData(60,Math.floor(canvas.height-59*1.5),Math.floor(canvas.width-120),40).data;
         let ink=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]<130&&pixels[i+1]<130&&pixels[i+2]<130)ink++;
-        return {ink,footer:Array.from(context.getImageData(18,1200,1,1).data)};
+        return {ink,footer:Array.from(context.getImageData(30,canvas.height-5,1,1).data),top:Array.from(context.getImageData(30,5,1,1).data)};
       });
     }finally{renderer.destroy();container.remove();}
   });
   expect(pages.length).toBeGreaterThan(1);
-  for(const [index,result] of pages.entries()){
-    if(index===pages.length-1)expect(result.ink).toBeGreaterThan(100);
-    else expect(result.ink).toBeLessThan(20);
-    expect(result.footer[0]).toBeGreaterThan(200);
-    expect(result.footer[1]).toBeLessThan(100);
-    expect(result.footer[2]).toBeLessThan(100);
+  for(const result of pages){
+    expect(result.ink).toBeGreaterThan(100);
+    for(const strip of [result.top,result.footer]){
+      expect(strip[0]).toBeGreaterThan(140);
+      expect(strip[0]).toBeLessThan(165);
+      expect(strip[1]).toBeLessThan(40);
+      expect(strip[2]).toBeLessThan(65);
+    }
   }
 });
 

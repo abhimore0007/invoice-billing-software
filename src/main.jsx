@@ -10,11 +10,11 @@ import {money,totals,words,types,prefixes} from '../shared/billing';
 import {downloadPDF} from './pdf';
 import './styles.css';
 
-const nav=[['Dashboard',LayoutDashboard],['Invoice',FileText],['Proforma',Files],['Quotes',MessageSquareText],['Delivery Challan',Truck],['History',History],['Users',Users]];
+const nav=[['Dashboard',LayoutDashboard],['Invoice',FileText],['Proforma',Files],['Quotes',MessageSquareText],['Delivery Challan',Truck],['History',History],['Clients',Building2],['Users',Users]];
 const today=()=>new Date().toISOString().slice(0,10);
 const emptyClient={name:'',company:'',address:'',city:'',state:'Maharashtra',pincode:'',gst:'',phone:'',email:''};
 const blankDoc=type=>({type,date:today(),clientId:'',status:'Pending',quotationNo:'',proformaNo:'',challanNo:'',poNo:'',poDate:today(),vendorCode:'',transport:'',items:[{description:'',hsn:'',qty:1,rate:0}],discount:0,cgst:9,sgst:9,igst:0,rounding:0,terms:'All Disputes are Subject to Mumbai jurisdiction Only.'});
-function Logo(){return <div className="brand"><div className="brand-mark"><span/><span/><span/></div><div>ruby<span className="brand-dot">.</span><small>INVOICE & BILLING</small></div></div>}
+function Logo(){return <div className="brand"><img className="brand-logo" src="/branding/v6-logo.png" alt="Ruby Hydraulic Co." width="1268" height="305"/><small>INVOICE & BILLING</small></div>}
 function App(){
  const [session,setSession]=useState(()=>{try{return JSON.parse(sessionStorage.getItem('ruby-session')||localStorage.getItem('ruby-session')||'null')}catch{return null}});
  const [demo,setDemo]=useState(!session||session.mode==='demo'),[login,setLogin]=useState(false),[page,setPage]=useState('Dashboard'),[mobile,setMobile]=useState(false),[store,setStore]=useState(()=>{try{return removeSampleInvoice(JSON.parse(localStorage.getItem('ruby-demo'))||initialDemo())}catch{return initialDemo()}}),[busy,setBusy]=useState(false),[toast,setToast]=useState(null),[modal,setModal]=useState(null),[editing,setEditing]=useState(null),[search,setSearch]=useState(''),[notification,setNotification]=useState(false);
